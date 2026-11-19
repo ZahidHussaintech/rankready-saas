@@ -84,6 +84,8 @@ function AuthLandingPage({ user, onAuthSuccess }) {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isResetMode, setIsResetMode] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState('');
   const navigate = useNavigate();
 
   if (user) {
@@ -108,7 +110,26 @@ function AuthLandingPage({ user, onAuthSuccess }) {
       setLoading(false);
     }
   };
-
+  const handleResetPassword = async (e) => {
+  e.preventDefault();
+  setError('');
+  setResetSuccess('');
+  setLoading(true);
+  try {
+    const { data } = await API.post('/auth/reset-password', {
+      email: form.email,
+      agencyName: form.agencyName,
+      newPassword: form.password,
+    });
+    setResetSuccess(data.message);
+    setIsResetMode(false);
+    setIsLogin(true);
+  } catch (err) {
+    setError(err.response?.data?.message || 'Password reset failed.');
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
       {/* Top Navigation */}
@@ -280,6 +301,12 @@ function AuthLandingPage({ user, onAuthSuccess }) {
                 </p>
               </div>
 
+              {resetSuccess && (
+                <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs sm:text-sm font-medium">
+                  {resetSuccess}
+                </div>
+              )}
+
               {error && (
                 <div
                   role="alert"
@@ -289,79 +316,169 @@ function AuthLandingPage({ user, onAuthSuccess }) {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {!isLogin && (
-                  <>
-                    <div>
-                      <label htmlFor="reg-name" className="block text-xs font-semibold text-slate-700 mb-1.5">
-                        Your Full Name
+              {isResetMode ? (
+                <form onSubmit={handleResetPassword} className="space-y-4">
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600">
+                    Verify your registered <strong>Work Email</strong> and{' '}
+                    <strong>Agency Name</strong> to set a new password.
+                  </div>
+
+                  <div>
+                    <label htmlFor="reset-email" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Registered Work Email
+                    </label>
+                    <input
+                      id="reset-email"
+                      type="email"
+                      required
+                      placeholder="you@agency.com"
+                      value={form.email}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                      className="w-full min-h-[44px] px-3.5 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-emerald-700"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="reset-agency" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Registered Agency / Studio Name
+                    </label>
+                    <input
+                      id="reset-agency"
+                      type="text"
+                      required
+                      placeholder="e.g. biztools"
+                      value={form.agencyName}
+                      onChange={(e) => setForm({ ...form, agencyName: e.target.value })}
+                      className="w-full min-h-[44px] px-3.5 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-emerald-700"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="reset-pass" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      New Password (min 6 characters)
+                    </label>
+                    <input
+                      id="reset-pass"
+                      type="password"
+                      required
+                      minLength={6}
+                      placeholder="••••••••"
+                      value={form.password}
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      className="w-full min-h-[44px] px-3.5 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-emerald-700"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full min-h-[48px] rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-60"
+                  >
+                    {loading ? 'Updating Password...' : 'Reset Password & Sign In'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsResetMode(false);
+                      setError('');
+                    }}
+                    className="w-full min-h-[40px] text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer"
+                  >
+                    ← Back to Sign In
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  {!isLogin && (
+                    <>
+                      <div>
+                        <label htmlFor="reg-name" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                          Your Full Name
+                        </label>
+                        <input
+                          id="reg-name"
+                          type="text"
+                          required
+                          placeholder="Zahid Hussain"
+                          value={form.name}
+                          onChange={(e) => setForm({ ...form, name: e.target.value })}
+                          className="w-full min-h-[44px] px-3.5 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-emerald-700"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="reg-agency" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                          Agency or Studio Name
+                        </label>
+                        <input
+                          id="reg-agency"
+                          type="text"
+                          required
+                          placeholder="BizTools Digital Studio"
+                          value={form.agencyName}
+                          onChange={(e) => setForm({ ...form, agencyName: e.target.value })}
+                          className="w-full min-h-[44px] px-3.5 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-emerald-700"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  <div>
+                    <label htmlFor="auth-email" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Work Email
+                    </label>
+                    <input
+                      id="auth-email"
+                      type="email"
+                      required
+                      placeholder="you@agency.com"
+                      value={form.email}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                      className="w-full min-h-[44px] px-3.5 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-emerald-700"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label htmlFor="auth-pass" className="block text-xs font-semibold text-slate-700">
+                        Password (min 6 characters)
                       </label>
-                      <input
-                        id="reg-name"
-                        type="text"
-                        required
-                        placeholder="Zahid Hussain"
-                        value={form.name}
-                        onChange={(e) => setForm({ ...form, name: e.target.value })}
-                        className="w-full min-h-[44px] px-3.5 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-emerald-700"
-                      />
+                      {isLogin && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsResetMode(true);
+                            setError('');
+                            setResetSuccess('');
+                          }}
+                          className="text-xs font-semibold text-emerald-700 hover:underline cursor-pointer"
+                        >
+                          Forgot Password?
+                        </button>
+                      )}
                     </div>
-                    <div>
-                      <label htmlFor="reg-agency" className="block text-xs font-semibold text-slate-700 mb-1.5">
-                        Agency or Studio Name
-                      </label>
-                      <input
-                        id="reg-agency"
-                        type="text"
-                        placeholder="BizTools Digital Studio"
-                        value={form.agencyName}
-                        onChange={(e) => setForm({ ...form, agencyName: e.target.value })}
-                        className="w-full min-h-[44px] px-3.5 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-emerald-700"
-                      />
-                    </div>
-                  </>
-                )}
+                    <input
+                      id="auth-pass"
+                      type="password"
+                      required
+                      minLength={6}
+                      placeholder="••••••••"
+                      value={form.password}
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      className="w-full min-h-[44px] px-3.5 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-emerald-700"
+                    />
+                  </div>
 
-                <div>
-                  <label htmlFor="auth-email" className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Work Email
-                  </label>
-                  <input
-                    id="auth-email"
-                    type="email"
-                    required
-                    placeholder="you@agency.com"
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    className="w-full min-h-[44px] px-3.5 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-emerald-700"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="auth-pass" className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Password (min 6 characters)
-                  </label>
-                  <input
-                    id="auth-pass"
-                    type="password"
-                    required
-                    minLength={6}
-                    placeholder="••••••••"
-                    value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    className="w-full min-h-[44px] px-3.5 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-emerald-700"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full min-h-[48px] rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-60 shadow-xs"
-                >
-                  {loading ? 'Please wait...' : isLogin ? 'Open Workspace' : 'Create Free Workspace'}
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </form>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full min-h-[48px] rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-60 shadow-xs"
+                  >
+                    {loading ? 'Please wait...' : isLogin ? 'Open Workspace' : 'Create Free Workspace'}
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </form>
+              )}
             </div>
           </div>
         </section>

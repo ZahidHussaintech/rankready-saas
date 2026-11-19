@@ -86,5 +86,46 @@ router.get('/me', authMiddleware, async (req, res) => {
     res.status(500).json({ message: 'Failed to load profile.' });
   }
 });
+// ==========================================
+// FORGOT PASSWORD / ACCOUNT RECOVERY
+// ==========================================
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, agencyName, newPassword } = req.body;
 
+    if (!email || !agencyName || !newPassword) {
+      return res.status(400).json({
+        message: 'Email, Agency Name, and New Password are all required.',
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        message: 'New password must be at least 6 characters long.',
+      });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    if (!user) {
+      return res.status(404).json({ message: 'No account found with that email.' });
+    }
+
+    // Verify Agency Name matches (case-insensitive)
+    if (
+      (user.agencyName || '').trim().toLowerCase() !== agencyName.trim().toLowerCase()
+    ) {
+      return res.status(403).json({
+        message: 'Agency Name does not match our records for this email.',
+      });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    res.json({ message: 'Password updated successfully! You can now sign in.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Unable to reset password. Please try again.' });
+  }
+});
 export default router;
