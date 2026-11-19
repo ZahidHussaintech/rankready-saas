@@ -1,13 +1,53 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import AuditWorkspace from '../models/AuditWorkspace.js';
 import authMiddleware from '../middleware/auth.js';
 
 const router = express.Router();
 
+// Simple In-Memory Rate Limiter for /scan (Max 30 scans per 15 mins per user)
+const scanHistory = new Map();
+function scanRateLimiter(req, res, next) {
+  const key = req.userId || req.ip;
+  const now = Date.now();
+  const windowMs = 15 * 60 * 1000;
+  const timestamps = (scanHistory.get(key) || []).filter((t) => now - t < windowMs);
+  if (timestamps.length >= 30) {
+    return res.status(429).json({
+      message: 'Scan rate limit reached (30 scans / 15 mins). Please wait a few minutes.',
+    });
+  }
+  timestamps.push(now);
+  scanHistory.set(key, timestamps);
+  next();
+}
+
+// Block internal/private network URLs (SSRF Protection)
+function isSafePublicUrl(rawUrl) {
+  try {
+    const parsed = new URL(rawUrl);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return false;
+    const host = parsed.hostname.toLowerCase();
+    if (
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host === '0.0.0.0' ||
+      host.startsWith('192.168.') ||
+      host.startsWith('10.') ||
+      host.endsWith('.local')
+    ) {
+      return false;
+    }
+    return host.includes('.');
+  } catch {
+    return false;
+  }
+}
+
 // ==========================================
-// 1. LIVE WEBSITE URL AUTO-SCANNER (Deterministic & Protected)
+// 1. LIVE WEBSITE URL AUTO-SCANNER (Deterministic & Secure)
 // ==========================================
-router.post('/scan', authMiddleware, async (req, res) => {
+router.post('/scan', authMiddleware, scanRateLimiter, async (req, res) => {
   try {
     let { url } = req.body;
     if (!url || !url.trim()) {
@@ -19,6 +59,10 @@ router.post('/scan', authMiddleware, async (req, res) => {
       url = 'https://' + url;
     }
 
+    if (!isSafePublicUrl(url)) {
+      return res.status(400).json({ message: 'Please enter a valid public domain URL.' });
+    }
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12000);
 
@@ -27,7 +71,7 @@ router.post('/scan', authMiddleware, async (req, res) => {
       signal: controller.signal,
       headers: {
         'User-Agent':
-          'Mozilla/5.0 (compatible; RankReadyAuditBot/1.0; +https://biztools.zahidhussainofficial.com)',
+          'Mozilla/5.0 (compatible; RankReadyAuditBot/1.0; +https://app.zahidhussainofficial.com)',
       },
     });
     clearTimeout(timeout);
@@ -35,7 +79,6 @@ router.post('/scan', authMiddleware, async (req, res) => {
     const responseTimeMs = Date.now() - startTime;
     const html = await response.text();
 
-    // Extract deterministic on-page SEO & technical signals
     const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
     const title = titleMatch ? titleMatch[1].replace(/\s+/g, ' ').trim() : '';
 
@@ -52,8 +95,8 @@ router.post('/scan', authMiddleware, async (req, res) => {
     const h1Count = (html.match(/<h1\b[^>]*>/gi) || []).length;
     const isHttps = url.startsWith('https://');
 
-    // 100% Deterministic Score (100 points total — never fluctuates with network jitter)
-    let estimatedScore = 20; // Base reachable HTML score
+    // 100% Deterministic Score (Consistent across repeated scans)
+    let estimatedScore = 20;
     if (isHttps) estimatedScore += 15;
     if (title.length >= 15 && title.length <= 65) estimatedScore += 15;
     else if (title.length > 0) estimatedScore += 8;
@@ -67,7 +110,6 @@ router.post('/scan', authMiddleware, async (req, res) => {
     if (hasViewport && hasLangAttr) estimatedScore += 7;
     estimatedScore = Math.min(100, estimatedScore);
 
-    // Build clear practitioner findings
     const findings = [];
     if (!isHttps) findings.push('missing HTTPS SSL encryption');
     if (!title) findings.push('missing <title> tag');
@@ -122,7 +164,11 @@ router.post('/scan', authMiddleware, async (req, res) => {
 // ==========================================
 router.get('/public/:shareId', async (req, res) => {
   try {
-    const workspace = await AuditWorkspace.findOne({ shareId: req.params.shareId }).populate(
+    const cleanShareId = String(req.params.shareId || '').replace(/[^a-f0-9]/gi, '');
+    if (!cleanShareId) {
+      return res.status(404).json({ message: 'Client report not found.' });
+    }
+    const workspace = await AuditWorkspace.findOne({ shareId: cleanShareId }).populate(
       'user',
       'name agencyName email'
     );
@@ -186,6 +232,9 @@ router.post('/', authMiddleware, async (req, res) => {
 
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(404).json({ message: 'Workspace not found.' });
+    }
     const updated = await AuditWorkspace.findOneAndUpdate(
       { _id: req.params.id, user: req.userId },
       req.body,
@@ -200,6 +249,9 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
 router.delete('/:id', authMiddleware, async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(404).json({ message: 'Workspace not found.' });
+    }
     const deleted = await AuditWorkspace.findOneAndDelete({
       _id: req.params.id,
       user: req.userId,

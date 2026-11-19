@@ -16,6 +16,9 @@ import {
   Check,
   Radar,
   Printer,
+  Sparkles,
+  Share2,
+  TrendingUp,
 } from 'lucide-react';
 import API from './api';
 
@@ -28,7 +31,48 @@ const CHECKLIST_ITEMS = [
 ];
 
 // ==========================================
-// 1. LANDING & AUTH PAGE (Public Entry)
+// REUSABLE CIRCULAR SVG SCORE GAUGE
+// ==========================================
+function ScoreRing({ score = 0, size = 68 }) {
+  const safeScore = Math.max(0, Math.min(100, Number(score) || 0));
+  const strokeWidth = 6;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (safeScore / 100) * circumference;
+
+  const strokeColor =
+    safeScore >= 85 ? '#047857' : safeScore >= 55 ? '#b45309' : '#b91c1c';
+
+  return (
+    <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90" aria-hidden="true">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="transparent"
+          stroke="#e2e8f0"
+          strokeWidth={strokeWidth}
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="transparent"
+          stroke={strokeColor}
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+        />
+      </svg>
+      <span className="absolute text-sm font-extrabold text-slate-900">{safeScore}</span>
+    </div>
+  );
+}
+
+// ==========================================
+// 1. LANDING & AUTH PAGE (Editorial SaaS Showcase)
 // ==========================================
 function AuthLandingPage({ user, onAuthSuccess }) {
   const [isLogin, setIsLogin] = useState(true);
@@ -59,7 +103,7 @@ function AuthLandingPage({ user, onAuthSuccess }) {
       onAuthSuccess(data.user);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Unable to connect to server.');
+      setError(err.response?.data?.message || 'Unable to connect to server. Please retry.');
     } finally {
       setLoading(false);
     }
@@ -67,180 +111,286 @@ function AuthLandingPage({ user, onAuthSuccess }) {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
-      <header className="bg-white border-b border-slate-200">
+      {/* Top Navigation */}
+      <header className="bg-white/95 backdrop-blur-xs border-b border-slate-200 sticky top-0 z-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <span className="w-8 h-8 rounded-lg bg-emerald-700 text-white font-bold flex items-center justify-center text-sm">
+            <span className="w-9 h-9 rounded-xl bg-emerald-700 text-white font-extrabold flex items-center justify-center text-sm shadow-xs">
               RR
             </span>
-            <span className="font-bold text-lg tracking-tight text-slate-900">
-              RankReady <span className="text-emerald-700 font-semibold">Workspace</span>
-            </span>
+            <div>
+              <span className="font-extrabold text-lg tracking-tight text-slate-900 block leading-none">
+                RankReady <span className="text-emerald-700">Workspace</span>
+              </span>
+              <span className="text-[11px] text-slate-500 font-medium">
+                Client SEO Audit & Retainer Portal
+              </span>
+            </div>
           </div>
-          <a
-            href="https://biztools.zahidhussainofficial.com"
-            target="_blank"
-            rel="noreferrer"
-            className="min-h-[44px] inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 hover:text-emerald-700 px-3"
-          >
-            Free SEO Tools <ExternalLink className="w-4 h-4" />
-          </a>
+
+          <div className="flex items-center gap-3">
+            <a
+              href="https://biztools.zahidhussainofficial.com"
+              target="_blank"
+              rel="noreferrer"
+              className="min-h-[44px] inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-700 hover:text-emerald-700 px-3 rounded-xl hover:bg-slate-100 transition"
+            >
+              Free SEO Calculators <ExternalLink className="w-4 h-4" />
+            </a>
+          </div>
         </div>
       </header>
 
-      <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-12 grid lg:grid-cols-12 gap-10 items-center">
-        <div className="lg:col-span-7 space-y-6">
-          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold">
-            <ShieldCheck className="w-4 h-4" /> Built for SEO Consultants & Boutique Agencies
-          </span>
-          <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-900 leading-tight tracking-tight">
-            Turn Technical Website Audits Into Approved Monthly Retainers.
-          </h1>
-          <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-2xl">
-            Stop sending messy spreadsheets to UK, US, and Australian prospects. Run a live technical
-            site scan, capture exact metadata & schema findings, and share a branded client report
-            link or PDF in one click.
-          </p>
-
-          <ul className="space-y-3 pt-2">
-            {[
-              'Live URL scanner extracts Title, Meta Description, H1 count, Canonical, Schema & TTFB',
-              'Generate branded public audit links (/report/id) with 1-click PDF print export',
-              'Calculate and organize monthly USD retainer pipeline across active accounts',
-            ].map((point, idx) => (
-              <li key={idx} className="flex items-start gap-2.5 text-sm sm:text-base text-slate-700">
-                <CheckCircle2 className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
-                <span>{point}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="lg:col-span-5">
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-8 space-y-6">
-            <div className="flex rounded-xl bg-slate-100 p-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsLogin(true);
-                  setError('');
-                }}
-                className={`min-h-[44px] flex-1 rounded-lg text-sm font-semibold transition cursor-pointer ${
-                  isLogin ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Sign In
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsLogin(false);
-                  setError('');
-                }}
-                className={`min-h-[44px] flex-1 rounded-lg text-sm font-semibold transition cursor-pointer ${
-                  !isLogin ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Create Free Account
-              </button>
+      {/* Hero + Auth Split */}
+      <main className="flex-1">
+        <section className="max-w-6xl mx-auto px-4 sm:px-6 py-10 lg:py-14 grid lg:grid-cols-12 gap-10 items-start">
+          {/* Left Column: Value Proposition + Visual Sample Report Preview */}
+          <div className="lg:col-span-7 space-y-7">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold">
+              <ShieldCheck className="w-4 h-4 text-emerald-700" />
+              Built for Technical SEO Consultants & Boutique Agencies
             </div>
 
-            <div>
-              <h2 className="text-xl font-bold text-slate-900">
-                {isLogin ? 'Welcome back to your workspace' : 'Start your agency workspace'}
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-600 mt-1">
-                {isLogin
-                  ? 'Enter your credentials to manage client audits and proposals.'
-                  : 'Create unlimited client audit boards on the free starter tier.'}
-              </p>
-            </div>
+            <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-900 leading-[1.12] tracking-tight">
+              Turn Live Website Audits Into{' '}
+              <span className="text-emerald-700">Approved Monthly Retainers.</span>
+            </h1>
 
-            {error && (
-              <div
-                role="alert"
-                className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs sm:text-sm font-medium"
-              >
-                {error}
+            <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-2xl">
+              Stop sending messy spreadsheets to UK, US, and Australian prospects. Inspect any live
+              URL in seconds, verify metadata, canonicals, and schema, and share a branded client
+              report link or PDF in one click.
+            </p>
+
+            {/* Visual Illustrated Sample Audit Card (Increases Engagement & Trust) */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Live Sample Client Deliverable
+                  </span>
+                </div>
+                <span className="text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-md">
+                  1-Click Shareable URL
+                </span>
               </div>
-            )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {!isLogin && (
-                <>
-                  <div>
-                    <label htmlFor="reg-name" className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Your Full Name
-                    </label>
-                    <input
-                      id="reg-name"
-                      type="text"
-                      required
-                      placeholder="Zahid Hussain"
-                      value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      className="w-full min-h-[44px] px-3.5 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-emerald-700"
-                    />
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <p className="text-base font-bold text-slate-900">JPC by Samsic UK — Technical Audit</p>
+                  <p className="text-xs text-slate-500">
+                    Canonical Indexing • JSON-LD Schema • Core Web Vitals • $850/mo Scope
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    <span className="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 text-xs font-semibold">
+                      HTTPS Active
+                    </span>
+                    <span className="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 text-xs font-semibold">
+                      Single H1 Verified
+                    </span>
+                    <span className="px-2.5 py-1 rounded-md bg-amber-50 text-amber-800 text-xs font-semibold">
+                      Schema Action Needed
+                    </span>
                   </div>
+                </div>
+
+                <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 shrink-0">
+                  <ScoreRing score={86} size={58} />
                   <div>
-                    <label htmlFor="reg-agency" className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Agency or Brand Name
-                    </label>
-                    <input
-                      id="reg-agency"
-                      type="text"
-                      placeholder="BizTools Digital Studio"
-                      value={form.agencyName}
-                      onChange={(e) => setForm({ ...form, agencyName: e.target.value })}
-                      className="w-full min-h-[44px] px-3.5 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-emerald-700"
-                    />
+                    <p className="text-xs font-bold text-slate-900">Audit Score</p>
+                    <p className="text-[11px] text-slate-500">Deterministic Check</p>
                   </div>
-                </>
+                </div>
+              </div>
+            </div>
+
+            {/* 3-Step Visual Workflow */}
+            <div className="grid sm:grid-cols-3 gap-3 pt-1">
+              <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-1.5">
+                <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center">
+                  <Radar className="w-4 h-4 text-emerald-400" />
+                </div>
+                <h2 className="text-sm font-bold text-slate-900">1. Auto-Scan URL</h2>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Extract live Title, Meta Description, H1s, Canonical, Schema & TTFB speed.
+                </p>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-1.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-700 text-white flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4" />
+                </div>
+                <h2 className="text-sm font-bold text-slate-900">2. Scope Retainer</h2>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Track technical fixes and organize monthly USD retainer pipeline in one board.
+                </p>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-1.5">
+                <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center">
+                  <Share2 className="w-4 h-4 text-emerald-400" />
+                </div>
+                <h2 className="text-sm font-bold text-slate-900">3. Share Report</h2>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Send a clean /report/id link or print-ready PDF with zero client login friction.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Auth Card */}
+          <div className="lg:col-span-5 lg:sticky lg:top-24">
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-8 space-y-6">
+              <div className="flex rounded-xl bg-slate-100 p-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsLogin(true);
+                    setError('');
+                  }}
+                  className={`min-h-[44px] flex-1 rounded-lg text-sm font-bold transition cursor-pointer ${
+                    isLogin ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsLogin(false);
+                    setError('');
+                  }}
+                  className={`min-h-[44px] flex-1 rounded-lg text-sm font-bold transition cursor-pointer ${
+                    !isLogin ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Create Free Account
+                </button>
+              </div>
+
+              <div>
+                <h2 className="text-xl font-extrabold text-slate-900">
+                  {isLogin ? 'Welcome back to your workspace' : 'Launch your agency workspace'}
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-600 mt-1">
+                  {isLogin
+                    ? 'Sign in to manage client audits, checklists, and live reports.'
+                    : 'Free starter workspace — create unlimited client audit boards.'}
+                </p>
+              </div>
+
+              {error && (
+                <div
+                  role="alert"
+                  className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs sm:text-sm font-medium"
+                >
+                  {error}
+                </div>
               )}
 
-              <div>
-                <label htmlFor="auth-email" className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Work Email
-                </label>
-                <input
-                  id="auth-email"
-                  type="email"
-                  required
-                  placeholder="you@agency.com"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full min-h-[44px] px-3.5 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-emerald-700"
-                />
-              </div>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {!isLogin && (
+                  <>
+                    <div>
+                      <label htmlFor="reg-name" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        Your Full Name
+                      </label>
+                      <input
+                        id="reg-name"
+                        type="text"
+                        required
+                        placeholder="Zahid Hussain"
+                        value={form.name}
+                        onChange={(e) => setForm({ ...form, name: e.target.value })}
+                        className="w-full min-h-[44px] px-3.5 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-emerald-700"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="reg-agency" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        Agency or Studio Name
+                      </label>
+                      <input
+                        id="reg-agency"
+                        type="text"
+                        placeholder="BizTools Digital Studio"
+                        value={form.agencyName}
+                        onChange={(e) => setForm({ ...form, agencyName: e.target.value })}
+                        className="w-full min-h-[44px] px-3.5 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-emerald-700"
+                      />
+                    </div>
+                  </>
+                )}
 
-              <div>
-                <label htmlFor="auth-pass" className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Password (min 6 characters)
-                </label>
-                <input
-                  id="auth-pass"
-                  type="password"
-                  required
-                  minLength={6}
-                  placeholder="••••••••"
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  className="w-full min-h-[44px] px-3.5 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-emerald-700"
-                />
-              </div>
+                <div>
+                  <label htmlFor="auth-email" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Work Email
+                  </label>
+                  <input
+                    id="auth-email"
+                    type="email"
+                    required
+                    placeholder="you@agency.com"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    className="w-full min-h-[44px] px-3.5 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-emerald-700"
+                  />
+                </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full min-h-[48px] rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-60"
-              >
-                {loading ? 'Please wait...' : isLogin ? 'Open Workspace' : 'Create Workspace'}
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </form>
+                <div>
+                  <label htmlFor="auth-pass" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Password (min 6 characters)
+                  </label>
+                  <input
+                    id="auth-pass"
+                    type="password"
+                    required
+                    minLength={6}
+                    placeholder="••••••••"
+                    value={form.password}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    className="w-full min-h-[44px] px-3.5 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-emerald-700"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full min-h-[48px] rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-60 shadow-xs"
+                >
+                  {loading ? 'Please wait...' : isLogin ? 'Open Workspace' : 'Create Free Workspace'}
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </form>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      {/* Clean Footer */}
+      <footer className="bg-white border-t border-slate-200 py-6 px-4 sm:px-6">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+          <p>© {new Date().getFullYear()} RankReady Workspace • Built by Zahid Hussain</p>
+          <div className="flex items-center gap-4">
+            <a
+              href="https://zahidhussainofficial.com"
+              target="_blank"
+              rel="noreferrer"
+              className="hover:text-emerald-700 font-medium"
+            >
+              Portfolio
+            </a>
+            <a
+              href="https://biztools.zahidhussainofficial.com"
+              target="_blank"
+              rel="noreferrer"
+              className="hover:text-emerald-700 font-medium"
+            >
+              BizTools Calculators
+            </a>
           </div>
         </div>
-      </main>
+      </footer>
     </div>
   );
 }
@@ -393,11 +543,11 @@ function DashboardPage({ user, onLogout }) {
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
-            <span className="w-8 h-8 rounded-lg bg-emerald-700 text-white font-bold flex items-center justify-center text-sm">
+            <span className="w-9 h-9 rounded-xl bg-emerald-700 text-white font-extrabold flex items-center justify-center text-sm">
               RR
             </span>
             <div>
-              <span className="font-bold text-base sm:text-lg text-slate-900 block leading-none">
+              <span className="font-extrabold text-base sm:text-lg text-slate-900 block leading-none">
                 RankReady
               </span>
               <span className="text-xs text-slate-500">{user.agencyName}</span>
@@ -421,28 +571,45 @@ function DashboardPage({ user, onLogout }) {
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
         <section className="grid sm:grid-cols-3 gap-4">
-          <div className="bg-white border border-slate-200 rounded-2xl p-5">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Active Audits</p>
-            <p className="text-3xl font-extrabold text-slate-900 mt-1">{workspaces.length}</p>
-            <p className="text-xs text-slate-600 mt-1">Client domains tracked</p>
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Active Audits</p>
+              <p className="text-3xl font-extrabold text-slate-900 mt-1">{workspaces.length}</p>
+              <p className="text-xs text-slate-600 mt-1">Client domains tracked</p>
+            </div>
+            <div className="w-11 h-11 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
+              <BarChart3 className="w-5 h-5" />
+            </div>
           </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-5">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Proposed Retainer Pipeline
-            </p>
-            <p className="text-3xl font-extrabold text-slate-900 mt-1">
-              ${totalPipeline.toLocaleString()}/mo
-            </p>
-            <p className="text-xs text-slate-600 mt-1">Across all open proposals</p>
+
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Proposed Pipeline
+              </p>
+              <p className="text-3xl font-extrabold text-slate-900 mt-1">
+                ${totalPipeline.toLocaleString()}/mo
+              </p>
+              <p className="text-xs text-slate-600 mt-1">Across open proposals</p>
+            </div>
+            <div className="w-11 h-11 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
+              <Sparkles className="w-5 h-5" />
+            </div>
           </div>
-          <div className="bg-white border border-emerald-200 rounded-2xl p-5">
-            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-800">
-              Approved Monthly Retainers
-            </p>
-            <p className="text-3xl font-extrabold text-emerald-700 mt-1">
-              ${approvedMrr.toLocaleString()}/mo
-            </p>
-            <p className="text-xs text-slate-600 mt-1">Signed recurring clients</p>
+
+          <div className="bg-white border border-emerald-200 rounded-2xl p-5 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-800">
+                Approved MRR
+              </p>
+              <p className="text-3xl font-extrabold text-emerald-700 mt-1">
+                ${approvedMrr.toLocaleString()}/mo
+              </p>
+              <p className="text-xs text-slate-600 mt-1">Signed recurring clients</p>
+            </div>
+            <div className="w-11 h-11 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-700">
+              <TrendingUp className="w-5 h-5" />
+            </div>
           </div>
         </section>
 
@@ -456,7 +623,7 @@ function DashboardPage({ user, onLogout }) {
           <button
             type="button"
             onClick={() => setShowForm(!showForm)}
-            className="min-h-[44px] inline-flex items-center justify-center gap-2 px-5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm cursor-pointer"
+            className="min-h-[44px] inline-flex items-center justify-center gap-2 px-5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm cursor-pointer shadow-xs"
           >
             <Plus className="w-4 h-4" /> {showForm ? 'Close Form' : 'New Client Audit'}
           </button>
@@ -675,17 +842,20 @@ function DashboardPage({ user, onLogout }) {
                 >
                   <div className="space-y-4">
                     <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <span className="text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-md">
-                          {ws.targetMarket}
-                        </span>
-                        <h2 className="text-xl font-bold text-slate-900 mt-2">{ws.clientName}</h2>
-                        <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5 break-all">
-                          <Globe className="w-3.5 h-3.5 shrink-0" /> {ws.websiteUrl}
-                        </p>
+                      <div className="flex items-center gap-3.5">
+                        <ScoreRing score={ws.mobileSpeedScore} size={58} />
+                        <div>
+                          <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                            {ws.targetMarket}
+                          </span>
+                          <h2 className="text-lg font-bold text-slate-900 mt-1">{ws.clientName}</h2>
+                          <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5 break-all">
+                            <Globe className="w-3.5 h-3.5 shrink-0" /> {ws.websiteUrl}
+                          </p>
+                        </div>
                       </div>
 
-                      <div className="text-right">
+                      <div className="text-right shrink-0">
                         <label htmlFor={`status-${ws._id}`} className="sr-only">
                           Proposal Status
                         </label>
@@ -705,15 +875,7 @@ function DashboardPage({ user, onLogout }) {
                     <div className="grid grid-cols-3 gap-2 bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
                       <div>
                         <p className="text-[11px] font-medium text-slate-500">Audit Score</p>
-                        <p
-                          className={`text-base font-extrabold ${
-                            ws.mobileSpeedScore >= 85
-                              ? 'text-emerald-700'
-                              : ws.mobileSpeedScore >= 50
-                              ? 'text-amber-700'
-                              : 'text-red-700'
-                          }`}
-                        >
+                        <p className="text-base font-extrabold text-slate-900">
                           {ws.mobileSpeedScore}/100
                         </p>
                       </div>
@@ -851,7 +1013,7 @@ function PublicReportPage() {
         <button
           type="button"
           onClick={() => window.print()}
-          className="min-h-[44px] inline-flex items-center gap-2 px-4 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-xs font-bold text-slate-800 cursor-pointer"
+          className="min-h-[44px] inline-flex items-center gap-2 px-4 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-xs font-bold text-slate-800 cursor-pointer shadow-2xs"
         >
           <Printer className="w-4 h-4" /> Print / Save as PDF
         </button>
@@ -880,18 +1042,23 @@ function PublicReportPage() {
         </header>
 
         <section className="grid sm:grid-cols-3 gap-4">
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-            <p className="text-xs font-semibold text-slate-500">On-Page Audit Score</p>
-            <p className="text-2xl font-extrabold text-slate-900 mt-1">
-              {report.mobileSpeedScore} / 100
-            </p>
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center gap-3.5">
+            <ScoreRing score={report.mobileSpeedScore} size={56} />
+            <div>
+              <p className="text-xs font-semibold text-slate-500">On-Page Score</p>
+              <p className="text-lg font-extrabold text-slate-900">
+                {report.mobileSpeedScore} / 100
+              </p>
+            </div>
           </div>
+
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
             <p className="text-xs font-semibold text-slate-500">Technical Benchmarks Passed</p>
             <p className="text-2xl font-extrabold text-slate-900 mt-1">
               {completedCount} of {CHECKLIST_ITEMS.length}
             </p>
           </div>
+
           <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
             <p className="text-xs font-semibold text-emerald-800">Recommended Retainer</p>
             <p className="text-2xl font-extrabold text-emerald-800 mt-1">
