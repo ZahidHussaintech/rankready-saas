@@ -4,6 +4,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.js';
 import workspaceRoutes from './routes/workspaces.js';
+import toolsRoutes from './routes/tools.js';
 
 dotenv.config();
 
@@ -41,6 +42,7 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/workspaces', workspaceRoutes);
+app.use('/api/tools', toolsRoutes);
 
 // 404 Handler
 app.use((req, res) => {

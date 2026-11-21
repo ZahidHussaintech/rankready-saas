@@ -4,6 +4,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from '../server/routes/auth.js';
 import workspaceRoutes from '../server/routes/workspaces.js';
+import toolsRoutes from '../server/routes/tools.js';
 
 dotenv.config();
 
@@ -46,6 +47,7 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/workspaces', workspaceRoutes);
+app.use('/api/tools', toolsRoutes);
 
 app.use((err, req, res, next) => {
   console.error('API Error:', err.message);
