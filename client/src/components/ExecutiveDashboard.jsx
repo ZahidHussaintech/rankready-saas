@@ -218,50 +218,63 @@ export default function ExecutiveDashboard({ user, onLogout }) {
 
   const auditScore =
     liveScanResult?.estimatedScore ??
+    activeWorkspace?.mobileSpeedScore ??
     activeWorkspace?.seoScore ??
-    96;
+    88;
 
-  // Build real issues from liveScanResult or workspace checklist
+  // Merge live scan result with saved workspace scanMetrics & checks
+  const effectiveScan = liveScanResult || (activeWorkspace?.scanMetrics ? {
+    scannedUrl: activeWorkspace.websiteUrl,
+    estimatedScore: activeWorkspace.mobileSpeedScore,
+    responseTimeMs: activeWorkspace.scanMetrics.responseTimeMs,
+    title: activeWorkspace.scanMetrics.title,
+    metaDescription: activeWorkspace.scanMetrics.metaDescription,
+    h1Count: activeWorkspace.scanMetrics.h1Count,
+    isHttps: activeWorkspace.scanMetrics.isHttps,
+    checks: activeWorkspace.checks || {},
+  } : null);
+
+  // Build real issues from effectiveScan or workspace checks
   const computedIssues = (() => {
-    if (liveScanResult) {
+    if (effectiveScan) {
       const list = [];
-      if (!liveScanResult.isHttps) {
+      if (!effectiveScan.isHttps) {
         list.push({ title: 'Site is not enforcing HTTPS SSL encryption', severity: 'High' });
       }
-      if (!liveScanResult.title) {
+      if (!effectiveScan.title) {
         list.push({ title: 'Missing <title> tag on homepage', severity: 'High' });
-      } else if (liveScanResult.title.length > 65 || liveScanResult.title.length < 15) {
+      } else if (effectiveScan.title.length > 65 || effectiveScan.title.length < 15) {
         list.push({
-          title: `Title tag length suboptimal (${liveScanResult.title.length} chars — keep 15–65)`,
+          title: `Title tag length suboptimal (${effectiveScan.title.length} chars — keep 15–65)`,
           severity: 'Medium',
         });
       }
-      if (!liveScanResult.metaDescription) {
+      if (!effectiveScan.metaDescription) {
         list.push({ title: 'Missing meta description tag', severity: 'High' });
       } else if (
-        liveScanResult.metaDescription.length > 165 ||
-        liveScanResult.metaDescription.length < 60
+        effectiveScan.metaDescription.length > 165 ||
+        effectiveScan.metaDescription.length < 60
       ) {
         list.push({
-          title: `Meta description length suboptimal (${liveScanResult.metaDescription.length} chars)`,
+          title: `Meta description length suboptimal (${effectiveScan.metaDescription.length} chars)`,
           severity: 'Medium',
         });
       }
-      if (liveScanResult.h1Count === 0) {
+      if (effectiveScan.h1Count === 0) {
         list.push({ title: 'Missing primary <h1> heading tag', severity: 'High' });
-      } else if (liveScanResult.h1Count > 1) {
+      } else if (effectiveScan.h1Count > 1) {
         list.push({
-          title: `Multiple <h1> tags detected (${liveScanResult.h1Count} found)`,
+          title: `Multiple <h1> tags detected (${effectiveScan.h1Count} found)`,
           severity: 'Medium',
         });
       }
-      if (!liveScanResult.checks?.canonicalFixed) {
+      if (!effectiveScan.checks?.canonicalFixed) {
         list.push({ title: 'Missing rel="canonical" tag for duplicate control', severity: 'Medium' });
       }
-      if (!liveScanResult.checks?.schemaAdded) {
+      if (!effectiveScan.checks?.schemaAdded) {
         list.push({ title: 'No JSON-LD structured data schema detected', severity: 'Low' });
       }
-      if (!liveScanResult.checks?.sitemapSubmitted) {
+      if (!effectiveScan.checks?.sitemapSubmitted) {
         list.push({ title: 'Missing Open Graph (og:title) social metadata', severity: 'Low' });
       }
       if (list.length === 0) {
@@ -273,7 +286,7 @@ export default function ExecutiveDashboard({ user, onLogout }) {
       return list.slice(0, 4);
     }
 
-    if (activeWorkspace?.checklist) {
+    if ((activeWorkspace?.checks || activeWorkspace?.checklist)) {
       const list = [];
       CHECKLIST_ITEMS.forEach((item, idx) => {
         if (!activeWorkspace.checklist[item.key]) {
@@ -297,20 +310,20 @@ export default function ExecutiveDashboard({ user, onLogout }) {
 
   const crawledPages = liveScanResult ? 1 : 25;
   const passedChecks = liveScanResult
-    ? Object.values(liveScanResult.checks || {}).filter(Boolean).length +
-      (liveScanResult.isHttps ? 1 : 0) +
-      (liveScanResult.title ? 1 : 0) +
-      (liveScanResult.metaDescription ? 1 : 0)
-    : CHECKLIST_ITEMS.filter((i) => activeWorkspace?.checklist?.[i.key]).length + 18;
+    ? Object.values(effectiveScan.checks || {}).filter(Boolean).length +
+      (effectiveScan.isHttps ? 1 : 0) +
+      (effectiveScan.title ? 1 : 0) +
+      (effectiveScan.metaDescription ? 1 : 0)
+    : CHECKLIST_ITEMS.filter((i) => (activeWorkspace?.checks || activeWorkspace?.checklist)?.[i.key]).length + 18;
   const warningsCount = liveScanResult ? medCount + lowCount : medCount;
   const errorsCount = liveScanResult ? highCount : highCount;
 
-  // Real Core Web Vitals derived from live TTFB responseTimeMs
-  const ttfbMs = liveScanResult?.responseTimeMs ?? 145;
-  const lcpSeconds = liveScanResult
+  // Real Core Web Vitals derived from live or saved TTFB responseTimeMs
+  const ttfbMs = effectiveScan?.responseTimeMs ?? 195;
+  const lcpSeconds = effectiveScan
     ? Math.max(0.8, Number(((ttfbMs / 1000) * 2.4 + 0.6).toFixed(1)))
-    : 1.4;
-  const fidMs = liveScanResult ? Math.min(95, Math.max(12, Math.round(ttfbMs * 0.08))) : 18;
+    : 1.5;
+  const fidMs = effectiveScan ? Math.min(95, Math.max(12, Math.round(ttfbMs * 0.08))) : 22;
   const clsScore = auditScore >= 85 ? '0.02' : auditScore >= 65 ? '0.08' : '0.16';
 
   const handleLiveScan = async (e) => {
@@ -345,7 +358,7 @@ export default function ExecutiveDashboard({ user, onLogout }) {
         websiteUrl: liveScanResult.scannedUrl,
         monthlyRetainer: 500,
         seoScore: liveScanResult.estimatedScore,
-        checklist: liveScanResult.checks || {},
+        checklist: effectiveScan.checks || {},
         auditSummary: liveScanResult.executiveSummary || '',
       });
       const created = data.workspace || data;
@@ -363,7 +376,27 @@ export default function ExecutiveDashboard({ user, onLogout }) {
     e.preventDefault();
     if (!newProject.clientName || !newProject.websiteUrl) return;
     try {
-      const { data } = await API.post('/workspaces', newProject);
+      let scanData = null;
+      try {
+        const scanRes = await API.post('/workspaces/scan', { url: newProject.websiteUrl.trim() });
+        scanData = scanRes.data;
+      } catch (_) {}
+
+      const { data } = await API.post('/workspaces', {
+        clientName: newProject.clientName,
+        websiteUrl: scanData?.scannedUrl || newProject.websiteUrl.trim(),
+        monthlyRetainerUsd: Number(newProject.monthlyRetainer) || 500,
+        mobileSpeedScore: scanData?.estimatedScore ?? 80,
+        checks: scanData?.checks || {},
+        scanMetrics: scanData ? {
+          responseTimeMs: scanData.responseTimeMs,
+          title: scanData.title,
+          metaDescription: scanData.metaDescription,
+          h1Count: scanData.h1Count,
+          isHttps: scanData.isHttps,
+        } : undefined,
+        executiveSummary: scanData?.executiveSummary || '',
+      });
       const created = data.workspace || data;
       setWorkspaces((prev) => [created, ...prev]);
       setSelectedWsId(created._id);
@@ -376,16 +409,17 @@ export default function ExecutiveDashboard({ user, onLogout }) {
   };
 
   const handleToggleChecklist = async (ws, key) => {
+    const currentChecks = ws.checks || ws.checklist || {};
     const nextChecklist = {
-      ...(ws.checklist || {}),
-      [key]: !ws.checklist?.[key],
+      ...currentChecks,
+      [key]: !currentChecks[key],
     };
     const checkedCount = CHECKLIST_ITEMS.filter((i) => nextChecklist[i.key]).length;
     const nextScore = Math.min(100, 60 + checkedCount * 8);
     try {
       const { data } = await API.put(`/workspaces/${ws._id}`, {
-        checklist: nextChecklist,
-        seoScore: nextScore,
+        checks: nextChecklist,
+        mobileSpeedScore: nextScore,
       });
       const updated = data.workspace || data;
       setWorkspaces((prev) =>
@@ -621,14 +655,14 @@ export default function ExecutiveDashboard({ user, onLogout }) {
                         TTFB: {liveScanResult.responseTimeMs} ms
                       </span>
                       <span className="px-2 py-0.5 rounded bg-neutral-800 text-neutral-300">
-                        H1 Tags: {liveScanResult.h1Count}
+                        H1 Tags: {effectiveScan.h1Count}
                       </span>
                     </div>
                     <p className="text-xs text-neutral-300 leading-relaxed">
-                      <strong>Title:</strong> {liveScanResult.title || 'Missing'} •{' '}
+                      <strong>Title:</strong> {effectiveScan.title || 'Missing'} •{' '}
                       <strong>Meta:</strong>{' '}
-                      {liveScanResult.metaDescription
-                        ? `${liveScanResult.metaDescription.slice(0, 90)}...`
+                      {effectiveScan.metaDescription
+                        ? `${effectiveScan.metaDescription.slice(0, 90)}...`
                         : 'Missing'}
                     </p>
                   </div>
@@ -900,7 +934,7 @@ export default function ExecutiveDashboard({ user, onLogout }) {
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-bold">
-                          Score: {ws.seoScore || 92}/100
+                          Score: {ws.mobileSpeedScore ?? ws.seoScore ?? 85}/100
                         </span>
                         {ws.shareId && (
                           <Link
@@ -922,7 +956,7 @@ export default function ExecutiveDashboard({ user, onLogout }) {
 
                     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-2">
                       {CHECKLIST_ITEMS.map((item) => {
-                        const checked = !!ws.checklist?.[item.key];
+                        const checked = !!(ws.checks?.[item.key] ?? ws.checklist?.[item.key]);
                         return (
                           <button
                             key={item.key}
@@ -998,10 +1032,10 @@ export default function ExecutiveDashboard({ user, onLogout }) {
                     <div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-[#efc325]">
-                          ${ws.monthlyRetainer || 500}/mo Retainer
+                          ${ws.monthlyRetainerUsd ?? ws.monthlyRetainer ?? 500}/mo Retainer
                         </span>
                         <span className="text-xs font-bold text-emerald-400">
-                          {ws.seoScore || 92}/100
+                          {ws.mobileSpeedScore ?? ws.seoScore ?? 85}/100
                         </span>
                       </div>
                       <h3 className="text-base font-bold text-white mt-2">{ws.clientName}</h3>
