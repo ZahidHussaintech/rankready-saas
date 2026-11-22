@@ -223,16 +223,28 @@ export default function ExecutiveDashboard({ user, onLogout }) {
     88;
 
   // Merge live scan result with saved workspace scanMetrics & checks
-  const effectiveScan = liveScanResult || (activeWorkspace?.scanMetrics ? {
-    scannedUrl: activeWorkspace.websiteUrl,
-    estimatedScore: activeWorkspace.mobileSpeedScore,
-    responseTimeMs: activeWorkspace.scanMetrics.responseTimeMs,
-    title: activeWorkspace.scanMetrics.title,
-    metaDescription: activeWorkspace.scanMetrics.metaDescription,
-    h1Count: activeWorkspace.scanMetrics.h1Count,
-    isHttps: activeWorkspace.scanMetrics.isHttps,
-    checks: activeWorkspace.checks || {},
-  } : null);
+  const hasSavedMetrics =
+    activeWorkspace?.scanMetrics &&
+    (activeWorkspace.scanMetrics.responseTimeMs > 0 ||
+      Boolean(activeWorkspace.scanMetrics.detectedTitle || activeWorkspace.scanMetrics.title));
+
+  const effectiveScan =
+    liveScanResult ||
+    (hasSavedMetrics
+      ? {
+          scannedUrl: activeWorkspace.websiteUrl,
+          estimatedScore: activeWorkspace.mobileSpeedScore,
+          responseTimeMs: activeWorkspace.scanMetrics.responseTimeMs,
+          title: activeWorkspace.scanMetrics.detectedTitle || activeWorkspace.scanMetrics.title || '',
+          metaDescription:
+            activeWorkspace.scanMetrics.detectedDescription ||
+            activeWorkspace.scanMetrics.metaDescription ||
+            '',
+          h1Count: activeWorkspace.scanMetrics.h1Count ?? 0,
+          isHttps: activeWorkspace.scanMetrics.isHttps ?? true,
+          checks: activeWorkspace.checks || {},
+        }
+      : null);
 
   // Build real issues from effectiveScan or workspace checks
   const computedIssues = (() => {
@@ -390,8 +402,8 @@ export default function ExecutiveDashboard({ user, onLogout }) {
         checks: scanData?.checks || {},
         scanMetrics: scanData ? {
           responseTimeMs: scanData.responseTimeMs,
-          title: scanData.title,
-          metaDescription: scanData.metaDescription,
+          detectedTitle: scanData.title,
+          detectedDescription: scanData.metaDescription,
           h1Count: scanData.h1Count,
           isHttps: scanData.isHttps,
         } : undefined,
@@ -439,8 +451,8 @@ export default function ExecutiveDashboard({ user, onLogout }) {
         checks: s.checks || {},
         scanMetrics: {
           responseTimeMs: s.responseTimeMs,
-          title: s.title,
-          metaDescription: s.metaDescription,
+          detectedTitle: s.title,
+          detectedDescription: s.metaDescription,
           h1Count: s.h1Count,
           isHttps: s.isHttps,
         },
@@ -453,6 +465,29 @@ export default function ExecutiveDashboard({ user, onLogout }) {
       setActiveTab('dashboard');
     } catch (err) {
       alert(err.response?.data?.message || 'Could not re-audit this URL.');
+    }
+  };
+
+  const handleReAuditAll = async () => {
+    for (const ws of workspaces) {
+      try {
+        const scanRes = await API.post('/workspaces/scan', { url: ws.websiteUrl });
+        const s = scanRes.data;
+        const { data } = await API.put(`/workspaces/${ws._id}`, {
+          mobileSpeedScore: s.estimatedScore,
+          checks: s.checks || {},
+          scanMetrics: {
+            responseTimeMs: s.responseTimeMs,
+            detectedTitle: s.title,
+            detectedDescription: s.metaDescription,
+            h1Count: s.h1Count,
+            isHttps: s.isHttps,
+          },
+          executiveSummary: s.executiveSummary || '',
+        });
+        const updated = data.workspace || data;
+        setWorkspaces((prev) => prev.map((item) => (item._id === ws._id ? updated : item)));
+      } catch (_) {}
     }
   };
 
@@ -1049,6 +1084,16 @@ export default function ExecutiveDashboard({ user, onLogout }) {
                 </button>
               </form>
 
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-neutral-300">Saved Client Workspaces ({workspaces.length})</h2>
+                <button
+                  type="button"
+                  onClick={handleReAuditAll}
+                  className="px-4 py-2 rounded-xl bg-[#efc325]/15 border border-[#efc325]/40 text-[#efc325] hover:bg-[#efc325] hover:text-black text-xs font-bold flex items-center gap-2 transition cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" /> Sync &amp; Re-Audit All Saved Sites
+                </button>
+              </div>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {workspaces.map((ws) => (
                   <div
@@ -1110,9 +1155,20 @@ export default function ExecutiveDashboard({ user, onLogout }) {
                     key={ws._id}
                     className="py-4 flex flex-wrap items-center justify-between gap-4"
                   >
-                    <div>
-                      <div className="text-sm font-bold text-white">{ws.clientName}</div>
-                      <div className="text-xs text-neutral-400">{ws.websiteUrl}</div>
+                    <div className="max-w-xl">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-sm font-bold text-white">{ws.clientName}</span>
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 text-xs font-bold">
+                          Score: {ws.mobileSpeedScore ?? 85}/100
+                        </span>
+                        {ws.scanMetrics?.responseTimeMs > 0 && (
+                          <span className="text-[11px] text-[#efc325]">TTFB {ws.scanMetrics.responseTimeMs}ms</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-neutral-400 mt-0.5">{ws.websiteUrl}</div>
+                      {ws.executiveSummary && (
+                        <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{ws.executiveSummary}</p>
+                      )}
                     </div>
                     <div className="flex items-center gap-2.5">
                       {ws.shareId && (
