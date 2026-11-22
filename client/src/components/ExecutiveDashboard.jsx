@@ -70,7 +70,7 @@ export function RankReadyLogo() {
   );
 }
 
-export function SemiCircleAuditGauge({ score = 96 }) {
+export function SemiCircleAuditGauge({ score = 88 }) {
   const safeScore = Math.max(0, Math.min(100, Number(score) || 0));
   const radius = 92;
   const circumference = Math.PI * radius;
@@ -156,6 +156,7 @@ export default function ExecutiveDashboard({ user, onLogout }) {
   const [scanError, setScanError] = useState('');
   const [liveScanResult, setLiveScanResult] = useState(null);
   const [savingScan, setSavingScan] = useState(false);
+  const [syncingAll, setSyncingAll] = useState(false);
 
   const [newProject, setNewProject] = useState({
     clientName: '',
@@ -212,21 +213,10 @@ export default function ExecutiveDashboard({ user, onLogout }) {
   const activeWorkspace =
     workspaces.find((w) => w._id === selectedWsId) || workspaces[0] || null;
 
-  // Compute REAL dynamic metrics from liveScanResult OR selected workspace
-  const displayUrl =
-    liveScanResult?.scannedUrl || activeWorkspace?.websiteUrl || 'https://zahidhussainofficial.com';
-
-  const auditScore =
-    liveScanResult?.estimatedScore ??
-    activeWorkspace?.mobileSpeedScore ??
-    activeWorkspace?.seoScore ??
-    88;
-
-  // Merge live scan result with saved workspace scanMetrics & checks
   const hasSavedMetrics =
     activeWorkspace?.scanMetrics &&
-    (activeWorkspace.scanMetrics.responseTimeMs > 0 ||
-      Boolean(activeWorkspace.scanMetrics.detectedTitle || activeWorkspace.scanMetrics.title));
+    (Number(activeWorkspace.scanMetrics.responseTimeMs) > 0 ||
+      Boolean(activeWorkspace.scanMetrics.detectedTitle));
 
   const effectiveScan =
     liveScanResult ||
@@ -235,18 +225,22 @@ export default function ExecutiveDashboard({ user, onLogout }) {
           scannedUrl: activeWorkspace.websiteUrl,
           estimatedScore: activeWorkspace.mobileSpeedScore,
           responseTimeMs: activeWorkspace.scanMetrics.responseTimeMs,
-          title: activeWorkspace.scanMetrics.detectedTitle || activeWorkspace.scanMetrics.title || '',
-          metaDescription:
-            activeWorkspace.scanMetrics.detectedDescription ||
-            activeWorkspace.scanMetrics.metaDescription ||
-            '',
+          title: activeWorkspace.scanMetrics.detectedTitle || '',
+          metaDescription: activeWorkspace.scanMetrics.detectedDescription || '',
           h1Count: activeWorkspace.scanMetrics.h1Count ?? 0,
           isHttps: activeWorkspace.scanMetrics.isHttps ?? true,
           checks: activeWorkspace.checks || {},
         }
       : null);
 
-  // Build real issues from effectiveScan or workspace checks
+  const displayUrl =
+    effectiveScan?.scannedUrl || activeWorkspace?.websiteUrl || 'https://zahidhussainofficial.com';
+
+  const auditScore =
+    effectiveScan?.estimatedScore ??
+    activeWorkspace?.mobileSpeedScore ??
+    88;
+
   const computedIssues = (() => {
     if (effectiveScan) {
       const list = [];
@@ -298,39 +292,35 @@ export default function ExecutiveDashboard({ user, onLogout }) {
       return list.slice(0, 4);
     }
 
-    if ((activeWorkspace?.checks || activeWorkspace?.checklist)) {
-      const list = [];
-      CHECKLIST_ITEMS.forEach((item, idx) => {
-        if (!activeWorkspace.checklist[item.key]) {
-          list.push({
-            title: `Pending optimization: ${item.label}`,
-            severity: idx < 2 ? 'High' : idx < 4 ? 'Medium' : 'Low',
-          });
-        }
-      });
-      if (list.length > 0) return list.slice(0, 4);
-    }
+    const wsChecks = activeWorkspace?.checks || {};
+    const list = [];
+    CHECKLIST_ITEMS.forEach((item, idx) => {
+      if (!wsChecks[item.key]) {
+        list.push({
+          title: `Pending optimization: ${item.label}`,
+          severity: idx < 2 ? 'High' : idx < 4 ? 'Medium' : 'Low',
+        });
+      }
+    });
+    if (list.length > 0) return list.slice(0, 4);
 
-    return [
-      { title: 'All 5 core technical SEO benchmarks verified', severity: 'Low' },
-    ];
+    return [{ title: 'All 5 core technical SEO benchmarks verified', severity: 'Low' }];
   })();
 
   const highCount = computedIssues.filter((i) => i.severity === 'High').length;
   const medCount = computedIssues.filter((i) => i.severity === 'Medium').length;
   const lowCount = computedIssues.filter((i) => i.severity === 'Low').length;
 
-  const crawledPages = liveScanResult ? 1 : 25;
-  const passedChecks = liveScanResult
+  const crawledPages = effectiveScan ? 1 : 25;
+  const passedChecks = effectiveScan
     ? Object.values(effectiveScan.checks || {}).filter(Boolean).length +
       (effectiveScan.isHttps ? 1 : 0) +
       (effectiveScan.title ? 1 : 0) +
       (effectiveScan.metaDescription ? 1 : 0)
-    : CHECKLIST_ITEMS.filter((i) => (activeWorkspace?.checks || activeWorkspace?.checklist)?.[i.key]).length + 18;
-  const warningsCount = liveScanResult ? medCount + lowCount : medCount;
-  const errorsCount = liveScanResult ? highCount : highCount;
+    : CHECKLIST_ITEMS.filter((i) => activeWorkspace?.checks?.[i.key]).length + 18;
+  const warningsCount = medCount + lowCount;
+  const errorsCount = highCount;
 
-  // Real Core Web Vitals derived from live or saved TTFB responseTimeMs
   const ttfbMs = effectiveScan?.responseTimeMs ?? 195;
   const lcpSeconds = effectiveScan
     ? Math.max(0.8, Number(((ttfbMs / 1000) * 2.4 + 0.6).toFixed(1)))
@@ -368,10 +358,17 @@ export default function ExecutiveDashboard({ user, onLogout }) {
       const { data } = await API.post('/workspaces', {
         clientName: hostname,
         websiteUrl: liveScanResult.scannedUrl,
-        monthlyRetainer: 500,
-        seoScore: liveScanResult.estimatedScore,
-        checklist: effectiveScan.checks || {},
-        auditSummary: liveScanResult.executiveSummary || '',
+        monthlyRetainerUsd: 500,
+        mobileSpeedScore: liveScanResult.estimatedScore,
+        checks: liveScanResult.checks || {},
+        scanMetrics: {
+          responseTimeMs: liveScanResult.responseTimeMs,
+          detectedTitle: liveScanResult.title,
+          detectedDescription: liveScanResult.metaDescription,
+          h1Count: liveScanResult.h1Count,
+          isHttps: liveScanResult.isHttps,
+        },
+        executiveSummary: liveScanResult.executiveSummary || '',
       });
       const created = data.workspace || data;
       setWorkspaces((prev) => [created, ...prev]);
@@ -400,13 +397,15 @@ export default function ExecutiveDashboard({ user, onLogout }) {
         monthlyRetainerUsd: Number(newProject.monthlyRetainer) || 500,
         mobileSpeedScore: scanData?.estimatedScore ?? 80,
         checks: scanData?.checks || {},
-        scanMetrics: scanData ? {
-          responseTimeMs: scanData.responseTimeMs,
-          detectedTitle: scanData.title,
-          detectedDescription: scanData.metaDescription,
-          h1Count: scanData.h1Count,
-          isHttps: scanData.isHttps,
-        } : undefined,
+        scanMetrics: scanData
+          ? {
+              responseTimeMs: scanData.responseTimeMs,
+              detectedTitle: scanData.title,
+              detectedDescription: scanData.metaDescription,
+              h1Count: scanData.h1Count,
+              isHttps: scanData.isHttps,
+            }
+          : undefined,
         executiveSummary: scanData?.executiveSummary || '',
       });
       const created = data.workspace || data;
@@ -417,28 +416,6 @@ export default function ExecutiveDashboard({ user, onLogout }) {
       setActiveTab('dashboard');
     } catch (err) {
       alert(err.response?.data?.message || 'Could not create project.');
-    }
-  };
-
-  const handleToggleChecklist = async (ws, key) => {
-    const currentChecks = ws.checks || ws.checklist || {};
-    const nextChecklist = {
-      ...currentChecks,
-      [key]: !currentChecks[key],
-    };
-    const checkedCount = CHECKLIST_ITEMS.filter((i) => nextChecklist[i.key]).length;
-    const nextScore = Math.min(100, 60 + checkedCount * 8);
-    try {
-      const { data } = await API.put(`/workspaces/${ws._id}`, {
-        checks: nextChecklist,
-        mobileSpeedScore: nextScore,
-      });
-      const updated = data.workspace || data;
-      setWorkspaces((prev) =>
-        prev.map((item) => (item._id === ws._id ? updated : item))
-      );
-    } catch (err) {
-      console.error(err);
     }
   };
 
@@ -469,25 +446,52 @@ export default function ExecutiveDashboard({ user, onLogout }) {
   };
 
   const handleReAuditAll = async () => {
-    for (const ws of workspaces) {
-      try {
-        const scanRes = await API.post('/workspaces/scan', { url: ws.websiteUrl });
-        const s = scanRes.data;
-        const { data } = await API.put(`/workspaces/${ws._id}`, {
-          mobileSpeedScore: s.estimatedScore,
-          checks: s.checks || {},
-          scanMetrics: {
-            responseTimeMs: s.responseTimeMs,
-            detectedTitle: s.title,
-            detectedDescription: s.metaDescription,
-            h1Count: s.h1Count,
-            isHttps: s.isHttps,
-          },
-          executiveSummary: s.executiveSummary || '',
-        });
-        const updated = data.workspace || data;
-        setWorkspaces((prev) => prev.map((item) => (item._id === ws._id ? updated : item)));
-      } catch (_) {}
+    setSyncingAll(true);
+    try {
+      for (const ws of workspaces) {
+        try {
+          const scanRes = await API.post('/workspaces/scan', { url: ws.websiteUrl });
+          const s = scanRes.data;
+          const { data } = await API.put(`/workspaces/${ws._id}`, {
+            mobileSpeedScore: s.estimatedScore,
+            checks: s.checks || {},
+            scanMetrics: {
+              responseTimeMs: s.responseTimeMs,
+              detectedTitle: s.title,
+              detectedDescription: s.metaDescription,
+              h1Count: s.h1Count,
+              isHttps: s.isHttps,
+            },
+            executiveSummary: s.executiveSummary || '',
+          });
+          const updated = data.workspace || data;
+          setWorkspaces((prev) => prev.map((item) => (item._id === ws._id ? updated : item)));
+        } catch (_) {}
+      }
+    } finally {
+      setSyncingAll(false);
+    }
+  };
+
+  const handleToggleChecklist = async (ws, key) => {
+    const currentChecks = ws.checks || {};
+    const nextChecklist = {
+      ...currentChecks,
+      [key]: !currentChecks[key],
+    };
+    const checkedCount = CHECKLIST_ITEMS.filter((i) => nextChecklist[i.key]).length;
+    const nextScore = Math.min(100, 60 + checkedCount * 8);
+    try {
+      const { data } = await API.put(`/workspaces/${ws._id}`, {
+        checks: nextChecklist,
+        mobileSpeedScore: nextScore,
+      });
+      const updated = data.workspace || data;
+      setWorkspaces((prev) =>
+        prev.map((item) => (item._id === ws._id ? updated : item))
+      );
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -654,7 +658,7 @@ export default function ExecutiveDashboard({ user, onLogout }) {
               >
                 {workspaces.map((ws) => (
                   <option key={ws._id} value={ws._id}>
-                    {ws.clientName} ({ws.websiteUrl})
+                    {ws.clientName} ({ws.mobileSpeedScore ?? 85}/100)
                   </option>
                 ))}
               </select>
@@ -707,13 +711,16 @@ export default function ExecutiveDashboard({ user, onLogout }) {
                 </div>
               )}
 
-              {liveScanResult && (
+              {effectiveScan && (
                 <div className="p-4 rounded-2xl bg-[#141414] border border-[#efc325]/40 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-[#efc325]">
-                      <span>LIVE AUDIT RESULT: {liveScanResult.scannedUrl}</span>
+                      <span>
+                        {liveScanResult ? 'LIVE AUDIT RESULT:' : 'SAVED WORKSPACE AUDIT:'}{' '}
+                        {effectiveScan.scannedUrl}
+                      </span>
                       <span className="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400">
-                        TTFB: {liveScanResult.responseTimeMs} ms
+                        TTFB: {effectiveScan.responseTimeMs} ms
                       </span>
                       <span className="px-2 py-0.5 rounded bg-neutral-800 text-neutral-300">
                         H1 Tags: {effectiveScan.h1Count}
@@ -727,14 +734,16 @@ export default function ExecutiveDashboard({ user, onLogout }) {
                         : 'Missing'}
                     </p>
                   </div>
-                  <button
-                    onClick={handleSaveLiveScanAsProject}
-                    disabled={savingScan}
-                    className="px-4 py-2 rounded-xl bg-[#efc325] text-black text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer"
-                  >
-                    <BookmarkPlus className="w-4 h-4" />
-                    {savingScan ? 'Saving...' : 'Save as Client Project'}
-                  </button>
+                  {liveScanResult && (
+                    <button
+                      onClick={handleSaveLiveScanAsProject}
+                      disabled={savingScan}
+                      className="px-4 py-2 rounded-xl bg-[#efc325] text-black text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer"
+                    >
+                      <BookmarkPlus className="w-4 h-4" />
+                      {savingScan ? 'Saving...' : 'Save as Client Project'}
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -995,7 +1004,7 @@ export default function ExecutiveDashboard({ user, onLogout }) {
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-bold">
-                          Score: {ws.mobileSpeedScore ?? ws.seoScore ?? 85}/100
+                          Score: {ws.mobileSpeedScore ?? 85}/100
                         </span>
                         {ws.shareId && (
                           <Link
@@ -1017,7 +1026,7 @@ export default function ExecutiveDashboard({ user, onLogout }) {
 
                     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-2">
                       {CHECKLIST_ITEMS.map((item) => {
-                        const checked = !!(ws.checks?.[item.key] ?? ws.checklist?.[item.key]);
+                        const checked = !!ws.checks?.[item.key];
                         return (
                           <button
                             key={item.key}
@@ -1084,16 +1093,21 @@ export default function ExecutiveDashboard({ user, onLogout }) {
                 </button>
               </form>
 
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-bold text-neutral-300">Saved Client Workspaces ({workspaces.length})</h2>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-sm font-bold text-neutral-300">
+                  Saved Client Workspaces ({workspaces.length})
+                </h2>
                 <button
                   type="button"
+                  disabled={syncingAll}
                   onClick={handleReAuditAll}
                   className="px-4 py-2 rounded-xl bg-[#efc325]/15 border border-[#efc325]/40 text-[#efc325] hover:bg-[#efc325] hover:text-black text-xs font-bold flex items-center gap-2 transition cursor-pointer"
                 >
-                  <RefreshCw className="w-3.5 h-3.5" /> Sync &amp; Re-Audit All Saved Sites
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncingAll ? 'animate-spin' : ''}`} />
+                  {syncingAll ? 'Syncing All Sites...' : 'Sync & Re-Audit All Saved Sites'}
                 </button>
               </div>
+
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {workspaces.map((ws) => (
                   <div
@@ -1103,10 +1117,10 @@ export default function ExecutiveDashboard({ user, onLogout }) {
                     <div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-[#efc325]">
-                          ${ws.monthlyRetainerUsd ?? ws.monthlyRetainer ?? 500}/mo Retainer
+                          ${ws.monthlyRetainerUsd ?? 500}/mo Retainer
                         </span>
                         <span className="text-xs font-bold text-emerald-400">
-                          {ws.mobileSpeedScore ?? ws.seoScore ?? 85}/100
+                          {ws.mobileSpeedScore ?? 85}/100
                         </span>
                       </div>
                       <h3 className="text-base font-bold text-white mt-2">{ws.clientName}</h3>
@@ -1162,12 +1176,16 @@ export default function ExecutiveDashboard({ user, onLogout }) {
                           Score: {ws.mobileSpeedScore ?? 85}/100
                         </span>
                         {ws.scanMetrics?.responseTimeMs > 0 && (
-                          <span className="text-[11px] text-[#efc325]">TTFB {ws.scanMetrics.responseTimeMs}ms</span>
+                          <span className="text-[11px] text-[#efc325]">
+                            TTFB {ws.scanMetrics.responseTimeMs}ms
+                          </span>
                         )}
                       </div>
                       <div className="text-xs text-neutral-400 mt-0.5">{ws.websiteUrl}</div>
                       {ws.executiveSummary && (
-                        <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{ws.executiveSummary}</p>
+                        <p className="text-xs text-neutral-500 mt-1 line-clamp-2">
+                          {ws.executiveSummary}
+                        </p>
                       )}
                     </div>
                     <div className="flex items-center gap-2.5">
