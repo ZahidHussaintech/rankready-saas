@@ -430,6 +430,32 @@ export default function ExecutiveDashboard({ user, onLogout }) {
     }
   };
 
+  const handleReAuditWorkspace = async (ws) => {
+    try {
+      const scanRes = await API.post('/workspaces/scan', { url: ws.websiteUrl });
+      const s = scanRes.data;
+      const { data } = await API.put(`/workspaces/${ws._id}`, {
+        mobileSpeedScore: s.estimatedScore,
+        checks: s.checks || {},
+        scanMetrics: {
+          responseTimeMs: s.responseTimeMs,
+          title: s.title,
+          metaDescription: s.metaDescription,
+          h1Count: s.h1Count,
+          isHttps: s.isHttps,
+        },
+        executiveSummary: s.executiveSummary || '',
+      });
+      const updated = data.workspace || data;
+      setWorkspaces((prev) => prev.map((item) => (item._id === ws._id ? updated : item)));
+      setSelectedWsId(updated._id);
+      setLiveScanResult(null);
+      setActiveTab('dashboard');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Could not re-audit this URL.');
+    }
+  };
+
   const handleDeleteWorkspace = async (id) => {
     try {
       await API.delete(`/workspaces/${id}`);
@@ -1041,16 +1067,24 @@ export default function ExecutiveDashboard({ user, onLogout }) {
                       <h3 className="text-base font-bold text-white mt-2">{ws.clientName}</h3>
                       <p className="text-xs text-neutral-400 truncate mt-0.5">{ws.websiteUrl}</p>
                     </div>
-                    <button
-                      onClick={() => {
-                        setSelectedWsId(ws._id);
-                        setLiveScanResult(null);
-                        setActiveTab('dashboard');
-                      }}
-                      className="w-full py-2 rounded-xl bg-[#1b1b1b] hover:bg-[#efc325] hover:text-black text-xs font-bold transition cursor-pointer"
-                    >
-                      Load in Executive Dashboard
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setSelectedWsId(ws._id);
+                          setLiveScanResult(null);
+                          setActiveTab('dashboard');
+                        }}
+                        className="flex-1 py-2 rounded-xl bg-[#1b1b1b] hover:bg-[#efc325] hover:text-black text-xs font-bold transition cursor-pointer"
+                      >
+                        Load Dashboard
+                      </button>
+                      <button
+                        onClick={() => handleReAuditWorkspace(ws)}
+                        className="px-3 py-2 rounded-xl bg-[#efc325]/15 border border-[#efc325]/40 text-[#efc325] hover:bg-[#efc325] hover:text-black text-xs font-bold transition cursor-pointer"
+                      >
+                        Re-Audit
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
